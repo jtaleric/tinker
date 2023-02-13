@@ -9,7 +9,7 @@ run_netperf() {
     loops=$1
     shift
     for ((i=0; i<loops; i++)); do
-        netperf -s 2 $@ 2>&1 > result-${i} &
+        netperf -s 2 $@ 2>&1 > /tmp/result-${i} &
     done
     wait
     return 0
@@ -25,7 +25,7 @@ process_netperf() {
     rtl=0 # RT latency
     u=""
     top=""
-    for file in `ls result-*`; do 
+    for file in `ls /tmp/result-*`; do 
       top=$(head -n 1 $file)
       t=$(cat $file | grep "THROUGHPUT=" | awk -F= '{print $2}')
       rrtl=$(cat $file | grep "RT_LATENCY=" | awk -F= '{print $2}')
@@ -38,7 +38,7 @@ process_netperf() {
       l=$(echo $l+rl | bc)
       tp=$(echo $tp+$t | bc)
       u=$(cat $file | grep "UNITS")
-      mv $file old-$file
+      mv $file /tmp/old-$f
     done 
     echo "$top"
     echo "RT_LATENCY=$rtl"
