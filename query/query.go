@@ -23,11 +23,10 @@ type Hits struct {
 			Results struct {
 				UUID      string `json:"uuid"`
 				Timestamp string `json:"timestamp"`
-				Workload  string `json:"workload"`
-				Version   string `json:"ocp_version"`
-				Platform  string `json:"platform"`
-				Nodes     int    `json:"total_nodes"`
-				Result    string `json:"result"`
+				Workload  string `json:"jobName"`
+				Version   string `json:"metadata.ocpVersion"`
+				Platform  string `json:"metadata.platform"`
+				Nodes     int    `json:"metadata.totalNodes"`
 			} `json:"_source"`
 		} `json:"hits"`
 	} `json:"hits"`
@@ -136,7 +135,7 @@ func main() {
 		  "should": [
 			{
 			  "match_phrase": {
-				"platform.keyword": "%s"
+				"metadata.platform.keyword": "%s"
 			  }
 			}
 		  ],
@@ -151,7 +150,7 @@ func main() {
 			  "should": [
 				{
 				  "match_phrase": {
-					"benchmark.keyword": "%s"
+					"jobName.keyword": "%s"
 				  }
 				}
 			  ],
@@ -165,9 +164,9 @@ func main() {
 		"size": 10000,
 		"query": {"bool": {	"must": [],	"filter": [ { "bool": { "filter": [ { "bool": { "should": [ %s ],"minimum_should_match": 1 } },
 				 { "bool": {	"filter": [ { "bool": { "should": [ %s ], "minimum_should_match": 1 }},
-				 {"query_string": {"query": "ocp_version == %s"}}]}}]}}]}}
+				 {"query_string": {"query": "metadata.ocpVersion == %s"}}]}}]}}]}}
 		}`, strings.Join(pfilter, ","), strings.Join(wfilter, ","), *fver))
-	log.Debug(s)
+	log.Info(s)
 	search := opensearchapi.SearchRequest{
 		Index: []string{"ripsaw-kube-burner*"},
 		Body:  s,
@@ -182,6 +181,7 @@ func main() {
 	json.NewDecoder(result.Body).Decode(&d)
 	log.Infof("Found %d results\n", len(d.HitLists.Hit))
 	for _, v := range d.HitLists.Hit {
+		log.Info(v.Results.UUID)
 		if *minNodes > 0 {
 			if v.Results.Nodes < *minNodes {
 				continue
@@ -192,10 +192,10 @@ func main() {
 				continue
 			}
 		}
-		if v.Results.Result == "Failed" {
-			log.Warnf("UUID %s Resulted in %s", v.Results.UUID, v.Results.Result)
-			continue
-		}
+		//if v.Results.Result == "Failed" {
+		//	log.Warnf("UUID %s Resulted in %s", v.Results.UUID, v.Results.Result)
+		//		continue
+		//}
 		var c Collection
 		if len(v.Results.UUID) < 1 {
 			log.Warn("Missing UUID, skipping")
