@@ -1,0 +1,33 @@
+# --- Build Stage ---
+FROM maven:3.9-eclipse-temurin-21 AS builder
+WORKDIR /app
+
+# Copy POM and pre-fetch dependencies
+COPY pom.xml .
+RUN mvn dependency:resolve -B
+
+# Copy source code and compile
+COPY src ./src
+RUN mvn clean test-compile dependency:copy-dependencies -DincludeScope=test && \
+    mkdir -p /app/target/classes /app/target/test-classes
+
+# --- Runtime Stage ---
+# Updated to Java 21 to match builder output (class version 65.0)
+FROM eclipse-temurin:21-jre-alpine
+WORKDIR /app
+
+# Ensure results directory exists
+RUN mkdir -p /app/results
+
+# Copy compiled classes and dependencies
+COPY --from=builder /app/target/classes ./classes
+COPY --from=builder /app/target/test-classes ./test-classes
+COPY --from=builder /app/target/dependency ./lib
+
+RUN chgrp -R 0 /app && \
+    chmod -R g+rwX /app
+
+ENV JAVA_OPTS="-Xms4g -Xmx12g -Dgatling.data.file.bufferSize=16384"
+
+# Added -rf /app/results so Gatling creates reports without crashing
+CMD ["sh", "-c", "java $JAVA_OPTS -cp 'classes:test-classes:lib/*' io.gatling.app.Gatling -s com.couchbase.benchmark.CouchbaseApiGatlingSimulation -rf /app/results"]
