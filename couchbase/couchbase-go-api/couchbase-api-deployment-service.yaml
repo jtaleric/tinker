@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: couchbase-go-api
+  namespace: couchbase-cudn
+spec:
+  replicas: 4
+  selector:
+    matchLabels:
+      app: couchbase-go-api
+  template:
+    metadata:
+      labels:
+        app: couchbase-go-api
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: go-api
+          image: quay.io/jtaleric/couchbase-go-api:latest
+          imagePullPolicy: Always
+          env:
+            - name: CB_NODES
+              value: "10.70.0.5,10.70.0.12,10.70.0.13,10.70.0.14,10.70.0.3,10.70.0.4,10.70.0.6,10.70.0.7,10.70.0.8,10.70.0.9,10.70.0.10,10.70.0.11"
+            - name: CB_USER
+              value: "Administrator"
+            - name: CB_PASS
+              value: "Password123!"
+            - name: CB_BUCKET
+              value: "bench-bucket"
+            - name: PORT
+              value: "8080"
+          ports:
+            - containerPort: 8080
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: "10"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cb-go-api-service
+  namespace: couchbase-cudn
+spec:
+  selector:
+    app: couchbase-go-api
+  ports:
+    - protocol: TCP
+      port: 8080
+      targetPort: 8080

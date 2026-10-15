@@ -1,0 +1,28 @@
+# --- Build Stage ---
+FROM maven:3.9.6-eclipse-temurin-17-alpine AS builder
+WORKDIR /app
+
+# Copy POM and pre-fetch dependencies
+COPY pom.xml .
+RUN mvn dependency:resolve -B
+
+# Copy source code and compile
+COPY src ./src
+RUN mvn clean test-compile dependency:copy-dependencies -DincludeScope=test && \
+    mkdir -p /app/target/classes /app/target/test-classes
+
+# --- Runtime Stage ---
+FROM eclipse-temurin:17-jre-alpine
+WORKDIR /app
+
+# Copy compiled classes and dependencies
+COPY --from=builder /app/target/classes ./classes
+COPY --from=builder /app/target/test-classes ./test-classes
+COPY --from=builder /app/target/dependency ./lib
+
+RUN chgrp -R 0 /app && \
+    chmod -R g+rwX /app
+
+ENV JAVA_OPTS="-Xms4g -Xmx8g -Dgatling.data.file.bufferSize=16384"
+
+CMD ["sh", "-c", "java $JAVA_OPTS -cp 'classes:test-classes:lib/*' io.gatling.app.Gatling -s com.couchbase.benchmark.CouchbaseApiGatlingSimulation"]
