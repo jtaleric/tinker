@@ -1,0 +1,82 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gatling-runner
+  namespace: couchbase-cudn
+  labels:
+    app: gatling-runner
+spec:
+  replicas: 8
+  selector:
+    matchLabels:
+      app: gatling-runner
+  template:
+    metadata:
+      labels:
+        app: gatling-runner
+    spec:
+      affinity:
+        # Spread Gatling pods across distinct worker nodes to avoid CPU throttling
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - gatling-runner
+                topologyKey: "kubernetes.io/hostname"
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: gatling
+          image: quay.io/jtaleric/couchbase-gatling:101526
+          imagePullPolicy: Always
+          workingDir: /app
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              echo "Launching Gatling TPC Benchmark against Go API Service..."
+
+              # Run Gatling without -nr so native HTML reports are generated
+              java -server -Xms4G -Xmx12G \
+                --add-opens java.base/java.lang=ALL-UNNAMED \
+                --add-opens java.base/java.nio=ALL-UNNAMED \
+                --add-opens java.base/sun.nio.ch=ALL-UNNAMED \
+                -cp "classes:test-classes:lib/*" \
+                io.gatling.app.Gatling \
+                -s com.couchbase.benchmark.CouchbaseApiGatlingSimulation \
+                -rf /shared/results
+
+              echo "================================================="
+              echo "Gatling run finished!"
+              echo "Reports generated under /shared/results/"
+              echo "Pod will sleep indefinitely so you can copy the reports out."
+              echo "================================================="
+
+              # Keeps the container alive indefinitely
+              sleep infinity
+
+          env:
+            - name: API_URL
+              value: "http://cb-go-api-service.couchbase-cudn.svc:8080"
+            - name: TARGET_TPS_PER_POD
+              value: "10000"
+          volumeMounts:
+            - name: shared-data
+              mountPath: /shared
+          resources:
+            requests:
+              cpu: "10"
+              memory: "14Gi"
+      volumes:
+        - name: shared-data

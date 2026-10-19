@@ -1,0 +1,56 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: gatling-runner
+  namespace: couchbase-cudn
+spec:
+  restartPolicy: Never
+  securityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault    
+  containers:
+    - name: gatling
+      image: quay.io/jtaleric/couchbase-gatling:101526
+      env:
+      - name: API_URL
+        value: "http://cb-go-api-service.couchbase-cudn.svc:8080"
+      imagePullPolicy: Always
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+            - ALL
+      command: ["/bin/sh", "-c"]
+      args:
+        - |
+          echo "Launching Gatling TPC Benchmark against Go API Service..."
+
+          # Run Gatling without -nr so native HTML reports are generated
+          java -server -Xms4G -Xmx12G \
+            --add-opens java.base/java.lang=ALL-UNNAMED \
+            --add-opens java.base/java.nio=ALL-UNNAMED \
+            --add-opens java.base/sun.nio.ch=ALL-UNNAMED \
+            -cp "classes:test-classes:lib/*" \
+            io.gatling.app.Gatling \
+            -s com.couchbase.benchmark.CouchbaseApiGatlingSimulation \
+            -rf /shared/results
+
+          echo "================================================="
+          echo "Gatling run finished!"
+          echo "Reports generated under /shared/results/"
+          echo "Pod will sleep indefinitely so you can copy the reports out."
+          echo "================================================="
+          
+          # Keeps the container alive indefinitely
+          sleep infinity
+
+      volumeMounts:
+        - name: shared-data
+          mountPath: /shared
+      resources:
+        requests:
+          cpu: "10"
+  volumes:
+    - name: shared-data
+      emptyDir: {}
