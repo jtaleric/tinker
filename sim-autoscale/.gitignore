@@ -1,0 +1,12 @@
+# Extracted binaries (230MB hypershift CLI)
+bin/
+
+# Rendered manifests, downloaded components, hypershift install output
+generated/
+
+# Observation CSVs
+results/
+
+# Cluster credentials
+kubeconfig
+*.kubeconfig
