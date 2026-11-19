@@ -1,0 +1,89 @@
+# Fake node types for the HyperShift + kubemark autoscaler lab.
+#
+# Each entry becomes ONE autoscaler node group:
+#   KubemarkMachineTemplate + MachineDeployment (replicas 0, scaled only by
+#   HyperShift's own cluster-autoscaler).
+#
+# Adding a node type is an edit here followed by ./gen-nodetypes.sh.
+#
+# Fields:
+#   name          DNS-1123 label; becomes the MachineDeployment name suffix
+#   cpu           advertised node CPU capacity (kubemark extendedResources)
+#   memory        advertised node memory capacity; any resource.Quantity form
+#   zone          value for topology.kubernetes.io/zone
+#   instanceType  value for node.kubernetes.io/instance-type
+#   min / max     autoscaler node group bounds
+#
+# min is 0 for every group so that scale-from-zero is exercised. That relies on
+# the capacity annotations the generator writes onto each MachineDeployment --
+# without them the autoscaler cannot know the shape of a group it has never
+# seen a node from, and will silently refuse to scale it up.
+
+nodetypes:
+  # Two same-shape groups in different zones: exercises
+  # --balance-similar-node-groups=true, which HyperShift sets by default.
+  - name: m5-2xlarge-a
+    cpu: "8"
+    memory: "32G"
+    zone: us-east-2a
+    instanceType: m5.2xlarge
+    min: 8
+    max: 100
+
+  - name: m5-2xlarge-b
+    cpu: "8"
+    memory: "32G"
+    zone: us-east-2b
+    instanceType: m5.2xlarge
+    min: 3
+    max: 100
+
+  - name: m5-2xlarge-ab
+    cpu: "8"
+    memory: "32G"
+    zone: us-east-2b
+    instanceType: m5.2xlarge
+    min: 1
+    max: 100
+
+  - name: m5-2xlarge-ef
+    cpu: "8"
+    memory: "32G"
+    zone: us-east-2b
+    instanceType: m5.2xlarge
+    min: 5
+    max: 100
+
+  - name: m5-2xlarge-gh
+    cpu: "8"
+    memory: "32G"
+    zone: us-east-2b
+    instanceType: m5.2xlarge
+    min: 5
+    max: 100
+
+  - name: m5-2xlarge-jk
+    cpu: "8"
+    memory: "32G"
+    zone: us-east-2b
+    instanceType: m5.2xlarge
+    min: 1
+    max: 100
+
+  # Larger shape: a pod too big for the 8-core groups must select this one.
+  - name: m5-4xlarge-c
+    cpu: "16"
+    memory: "64G"
+    zone: us-east-2c
+    instanceType: m5.4xlarge
+    min: 5
+    max: 50
+
+  # Memory-heavy outlier: exercises expander choice. A 100Gi pod fits only here.
+  - name: r5-4xlarge-a
+    cpu: "16"
+    memory: "128G"
+    zone: us-east-2a
+    instanceType: r5.4xlarge
+    min: 10 
+    max: 50
